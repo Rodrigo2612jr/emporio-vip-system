@@ -6,15 +6,17 @@ export default function ReportsPage() {
   const [campaignMetrics, setCampaignMetrics] = useState<any[]>([]);
   const [productMetrics, setProductMetrics] = useState<any[]>([]);
   const [period, setPeriod] = useState('30');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.get('/metrics/campaigns', { params: { days: period } }),
       api.get('/metrics/products', { params: { days: period } })
     ]).then(([cRes, pRes]) => {
       setCampaignMetrics(cRes.data);
       setProductMetrics(pRes.data);
-    });
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [period]);
 
   return (
@@ -34,6 +36,10 @@ export default function ReportsPage() {
         </select>
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center h-40"><div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full" /></div>
+      ) : (
+      <>
       {/* Campaign Performance */}
       <div className="bg-white rounded-xl border p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -47,15 +53,15 @@ export default function ReportsPage() {
                 const maxMessages = Math.max(...campaignMetrics.map((m: any) => m.totalMessages || 1));
                 const barWidth = ((c.totalMessages || 0) / maxMessages) * 100;
                 return (
-                  <div key={c.campaignId} className="border rounded-lg p-4">
+                  <div key={c.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-gray-800">{c.campaignName}</h3>
+                      <h3 className="font-medium text-gray-800">{c.name}</h3>
                       <span className="text-xs text-gray-400">{c.status}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-4 mb-3">
                       <div>
-                        <p className="text-xs text-gray-500">Rotinas</p>
-                        <p className="text-lg font-bold text-gray-800">{c.routineCount}</p>
+                        <p className="text-xs text-gray-500">Leads</p>
+                        <p className="text-lg font-bold text-purple-600">{c.totalLeads}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Mensagens</p>
@@ -66,8 +72,8 @@ export default function ReportsPage() {
                         <p className="text-lg font-bold text-green-600">{c.sentMessages}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Leads</p>
-                        <p className="text-lg font-bold text-purple-600">{c.leadCount}</p>
+                        <p className="text-xs text-gray-500">Conversão</p>
+                        <p className="text-lg font-bold text-amber-600">{c.conversionRate}%</p>
                       </div>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
@@ -94,21 +100,17 @@ export default function ReportsPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Produto</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Campanhas</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Menções</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Leads</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Mídias</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Vendas</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Receita</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {productMetrics.map((p: any) => (
-                  <tr key={p.productId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-800">{p.productName}</td>
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-800">{p.name}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{p.category || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-800">{p.campaignCount}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-800">{p.mentionCount}</td>
-                    <td className="px-4 py-3 text-sm text-right text-purple-600 font-medium">{p.leadCount}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-800">{p.mediaCount}</td>
+                    <td className="px-4 py-3 text-sm text-right text-purple-600 font-medium">{p.salesCount}</td>
+                    <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">R$ {(p.revenue || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -116,6 +118,8 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

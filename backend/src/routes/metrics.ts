@@ -53,11 +53,17 @@ router.get('/dashboard', async (req: AuthRequest, res: Response): Promise<void> 
 // Métricas por campanha
 router.get('/campaigns', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const days = parseInt(String(req.query.days)) || 0;
+    const dateFilter = days > 0 ? new Date(Date.now() - days * 86400000) : undefined;
+
     const campaigns = await prisma.campaign.findMany({
       where: { status: { in: ['ativa', 'finalizada'] } },
       include: {
-        leads: true,
-        dailyRoutines: { include: { messages: true } }
+        leads: { where: dateFilter ? { createdAt: { gte: dateFilter } } : undefined },
+        dailyRoutines: {
+          where: dateFilter ? { date: { gte: dateFilter } } : undefined,
+          include: { messages: true }
+        }
       }
     });
 
@@ -90,8 +96,11 @@ router.get('/campaigns', async (req: AuthRequest, res: Response): Promise<void> 
 // Métricas por produto (top vendidos)
 router.get('/products', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const days = parseInt(String(req.query.days)) || 0;
+    const dateFilter = days > 0 ? new Date(Date.now() - days * 86400000) : undefined;
+
     const products = await prisma.product.findMany({
-      include: { leads: { where: { status: 'fechado' } } }
+      include: { leads: { where: { status: 'fechado', ...(dateFilter ? { updatedAt: { gte: dateFilter } } : {}) } } }
     });
 
     const metrics = products

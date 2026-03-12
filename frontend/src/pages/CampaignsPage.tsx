@@ -36,14 +36,18 @@ export default function CampaignsPage() {
 
   const save = async () => {
     const data = { ...form, anchorProductId: form.anchorProductId || null };
-    if (editing) {
-      await api.put(`/campaigns/${editing.id}`, data);
-    } else {
-      await api.post('/campaigns', data);
+    try {
+      if (editing) {
+        await api.put(`/campaigns/${editing.id}`, data);
+      } else {
+        await api.post('/campaigns', data);
+      }
+      setShowForm(false);
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao salvar campanha');
     }
-    setShowForm(false);
-    setEditing(null);
-    load();
   };
 
   const edit = (item: any) => {
@@ -60,8 +64,12 @@ export default function CampaignsPage() {
 
   const remove = async (id: string) => {
     if (!confirm('Remover esta campanha?')) return;
-    await api.delete(`/campaigns/${id}`);
-    load();
+    try {
+      await api.delete(`/campaigns/${id}`);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao remover. A campanha pode ter rotinas ou leads vinculados.');
+    }
   };
 
   const openNew = () => {

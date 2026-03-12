@@ -43,14 +43,18 @@ export default function ProductsPage() {
       promoPrice: form.promoPrice ? parseFloat(form.promoPrice) : null,
       tags: form.tags ? form.tags.split(',').map(t => t.trim()) : undefined
     };
-    if (editing) {
-      await api.put(`/products/${editing.id}`, data);
-    } else {
-      await api.post('/products', data);
+    try {
+      if (editing) {
+        await api.put(`/products/${editing.id}`, data);
+      } else {
+        await api.post('/products', data);
+      }
+      setShowForm(false);
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao salvar produto');
     }
-    setShowForm(false);
-    setEditing(null);
-    load();
   };
 
   const edit = (item: any) => {
@@ -66,8 +70,12 @@ export default function ProductsPage() {
 
   const remove = async (id: string) => {
     if (!confirm('Remover este produto?')) return;
-    await api.delete(`/products/${id}`);
-    load();
+    try {
+      await api.delete(`/products/${id}`);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao remover. O produto pode estar vinculado a leads ou campanhas.');
+    }
   };
 
   return (

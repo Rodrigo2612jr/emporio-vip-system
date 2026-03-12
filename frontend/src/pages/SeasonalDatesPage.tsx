@@ -38,8 +38,12 @@ export default function SeasonalDatesPage() {
     }
   };
 
-  const upcoming = dates.filter(d => new Date(d.date + 'T23:59:59') >= new Date()).sort((a, b) => a.date.localeCompare(b.date));
-  const past = dates.filter(d => new Date(d.date + 'T23:59:59') < new Date()).sort((a, b) => b.date.localeCompare(a.date));
+  const parseDate = (d: string) => {
+    const iso = d.includes('T') ? d.split('T')[0] : d;
+    return new Date(iso + 'T23:59:59');
+  };
+  const upcoming = dates.filter(d => parseDate(d.date) >= new Date()).sort((a, b) => a.date.localeCompare(b.date));
+  const past = dates.filter(d => parseDate(d.date) < new Date()).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="space-y-6">
@@ -76,7 +80,8 @@ export default function SeasonalDatesPage() {
             <h2 className="text-lg font-semibold text-gray-800 mb-3">📅 Próximas Datas ({upcoming.length})</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {upcoming.map(d => {
-                const dateObj = new Date(d.date + 'T12:00:00');
+                const isoDate = d.date.includes('T') ? d.date.split('T')[0] : d.date;
+                const dateObj = new Date(isoDate + 'T12:00:00');
                 const daysUntil = Math.ceil((dateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 return (
                   <div key={d.id} className="bg-white rounded-xl border p-4 hover:shadow-md transition">
@@ -113,7 +118,7 @@ export default function SeasonalDatesPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-medium text-gray-600">{d.name}</p>
-                        <p className="text-sm text-gray-400">{format(new Date(d.date + 'T12:00:00'), "dd 'de' MMMM", { locale: ptBR })}</p>
+                        <p className="text-sm text-gray-400">{format(new Date((d.date.includes('T') ? d.date.split('T')[0] : d.date) + 'T12:00:00'), "dd 'de' MMMM", { locale: ptBR })}</p>
                       </div>
                       <button onClick={() => remove(d.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                     </div>

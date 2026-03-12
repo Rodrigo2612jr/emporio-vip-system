@@ -32,9 +32,10 @@ export default function CalendarPage() {
   useEffect(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
+    setLoading(true);
     api.get('/daily-routines', {
       params: { startDate: start.toISOString(), endDate: end.toISOString() }
-    }).then(res => setRoutines(res.data)).finally(() => setLoading(false));
+    }).then(res => setRoutines(res.data)).catch(() => setRoutines([])).finally(() => setLoading(false));
   }, [currentMonth]);
 
   const days = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });

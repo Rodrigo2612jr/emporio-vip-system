@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -36,10 +37,11 @@ export default function DashboardPage() {
     ]).then(([dashRes, sugRes]) => {
       setData(dashRes.data);
       setSuggestions(sugRes.data);
-    }).finally(() => setLoading(false));
+    }).catch(() => setError('Erro ao carregar dashboard')).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full" /></div>;
+  if (error) return <div className="text-center py-12"><p className="text-red-500">{error}</p><button onClick={() => window.location.reload()} className="mt-2 text-sm text-blue-600 hover:underline">Tentar novamente</button></div>;
 
   const cards = [
     { label: 'Mensagens Enviadas', value: data?.sentMessages || 0, total: data?.totalMessages, icon: MessageSquare, color: 'blue' },

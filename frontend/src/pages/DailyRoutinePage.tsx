@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Save, Copy, Trash2, Plus, Send, ChevronLeft, AlertTriangle, Clock, GripVertical } from 'lucide-react';
+
+function useDebounce(fn: (...args: any[]) => void, delay: number) {
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  return useCallback((...args: any[]) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => fn(...args), delay);
+  }, [fn, delay]);
+}
 
 interface Message {
   id: string;
@@ -26,6 +34,8 @@ interface Routine {
   dailyGoal: string;
   notes: string;
   messageCount: number;
+  campaignId?: string | null;
+  focusProductId?: string | null;
   campaign?: { id: string; name: string };
   focusProduct?: { id: string; name: string };
   messages: Message[];
@@ -67,6 +77,9 @@ export default function DailyRoutinePage() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [localFields, setLocalFields] = useState({ objective: '', dailyGoal: '', notes: '' });
+  const [dirty, setDirty] = useState(false);
+  const [localMessages, setLocalMessages] = useState<Record<string, { text: string; cta: string }>>({});
 
   useEffect(() => {
     Promise.all([
@@ -75,6 +88,10 @@ export default function DailyRoutinePage() {
       api.get('/products')
     ]).then(([routineRes, campRes, prodRes]) => {
       setRoutine(routineRes.data);
+      setLocalFields({ objective: routineRes.data.objective || '', dailyGoal: routineRes.data.dailyGoal || '', notes: routineRes.data.notes || '' });
+      const msgState: Record<string, { text: string; cta: string }> = {};
+      (routineRes.data.messages || []).forEach((m: any) => { msgState[m.id] = { text: m.text || '', cta: m.cta || '' }; });
+      setLocalMessages(msgState);
       setCampaigns(campRes.data);
       setProducts(prodRes.data);
       // Check alerts
@@ -90,22 +107,38 @@ export default function DailyRoutinePage() {
     try {
       const res = await api.put(`/daily-routines/${id}`, data);
       setRoutine(res.data);
+      setLocalFields({ objective: res.data.objective || '', dailyGoal: res.data.dailyGoal || '', notes: res.data.notes || '' });
     } finally {
       setSaving(false);
     }
   };
 
-  const updateMessage = async (msgId: string, data: any) => {
+  const saveFields = async () => {
+    await updateRoutine(localFields);
+    setDirty(false);
+  };
+
+  const updateMessage = useCallback(async (msgId: string, data: any) => {
     const res = await api.put(`/messages/${msgId}`, data);
     setRoutine(prev => prev ? {
       ...prev,
       messages: prev.messages.map(m => m.id === msgId ? { ...m, ...res.data } : m)
     } : null);
+  }, []);
+
+  const debouncedUpdateMessage = useDebounce((msgId: string, data: any) => {
+    updateMessage(msgId, data);
+  }, 800);
+
+  const handleMsgTextChange = (msgId: string, field: 'text' | 'cta', value: string) => {
+    setLocalMessages(prev => ({ ...prev, [msgId]: { ...prev[msgId], [field]: value } }));
+    debouncedUpdateMessage(msgId, { [field]: value });
   };
 
   const addMessage = async () => {
     if (!routine || routine.messages.length >= 7) return;
     const res = await api.post(`/messages/routine/${id}`);
+    setLocalMessages(prev => ({ ...prev, [res.data.id]: { text: res.data.text || '', cta: res.data.cta || '' } }));
     setRoutine(prev => prev ? { ...prev, messages: [...prev.messages, res.data] } : null);
   };
 
@@ -203,21 +236,29 @@ export default function DailyRoutinePage() {
         </div>
         <div>
           <label className="block text-sm text-gray-600 mb-1">Objetivo do Dia</label>
-          <input value={routine.objective || ''} placeholder="Ex: Apresentar novo produto"
-            onChange={e => updateRoutine({ objective: e.target.value })}
+          <input value={localFields.objective} placeholder="Ex: Apresentar novo produto"
+            onChange={e => { setLocalFields(f => ({ ...f, objective: e.target.value })); setDirty(true); }}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
           <label className="block text-sm text-gray-600 mb-1">Meta do Dia</label>
-          <input value={routine.dailyGoal || ''} placeholder="Ex: 5 mensagens de interesse"
-            onChange={e => updateRoutine({ dailyGoal: e.target.value })}
+          <input value={localFields.dailyGoal} placeholder="Ex: 5 mensagens de interesse"
+            onChange={e => { setLocalFields(f => ({ ...f, dailyGoal: e.target.value })); setDirty(true); }}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm text-gray-600 mb-1">Observações</label>
-          <input value={routine.notes || ''} placeholder="Notas sobre o dia..."
-            onChange={e => updateRoutine({ notes: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm" />
+        <div className="md:col-span-2 flex gap-2 items-end">
+          <div className="flex-1">
+            <label className="block text-sm text-gray-600 mb-1">Observações</label>
+            <input value={localFields.notes} placeholder="Notas sobre o dia..."
+              onChange={e => { setLocalFields(f => ({ ...f, notes: e.target.value })); setDirty(true); }}
+              className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          {dirty && (
+            <button onClick={saveFields} disabled={saving}
+              className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-50 shrink-0">
+              <Save size={16} /> {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -270,15 +311,15 @@ export default function DailyRoutinePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Texto da Mensagem</label>
-                  <textarea value={msg.text || ''} rows={3} placeholder="Digite o texto da mensagem..."
-                    onChange={e => updateMessage(msg.id, { text: e.target.value })}
+                  <textarea value={localMessages[msg.id]?.text ?? msg.text ?? ''} rows={3} placeholder="Digite o texto da mensagem..."
+                    onChange={e => handleMsgTextChange(msg.id, 'text', e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
                 </div>
                 <div className="space-y-2">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">CTA (Chamada para Ação)</label>
-                    <input value={msg.cta || ''} placeholder="Ex: Peça pelo WhatsApp 📲"
-                      onChange={e => updateMessage(msg.id, { cta: e.target.value })}
+                    <input value={localMessages[msg.id]?.cta ?? msg.cta ?? ''} placeholder="Ex: Peça pelo WhatsApp 📲"
+                      onChange={e => handleMsgTextChange(msg.id, 'cta', e.target.value)}
                       className="w-full border rounded-lg px-3 py-2 text-sm" />
                   </div>
                   <div>

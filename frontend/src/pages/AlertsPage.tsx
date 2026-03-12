@@ -4,8 +4,8 @@ import { AlertTriangle, Check, Calendar, RefreshCw } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 const severityColors: Record<string, string> = {
-  critico: 'border-l-red-500 bg-red-50',
-  aviso: 'border-l-yellow-500 bg-yellow-50',
+  error: 'border-l-red-500 bg-red-50',
+  warning: 'border-l-yellow-500 bg-yellow-50',
   info: 'border-l-blue-500 bg-blue-50',
 };
 
@@ -17,8 +17,8 @@ export default function AlertsPage() {
   const checkAlerts = async () => {
     setLoading(true);
     try {
-      const res = await api.post(`/alerts/check/${checkDate}`);
-      setAlerts(res.data);
+      const res = await api.get(`/alerts/check/${checkDate}`);
+      setAlerts(res.data.map((a: any, i: number) => ({ ...a, _key: `${checkDate}-${i}` })));
     } finally {
       setLoading(false);
     }
@@ -27,13 +27,9 @@ export default function AlertsPage() {
   const checkWeek = async () => {
     setLoading(true);
     try {
-      const all: any[] = [];
-      for (let i = 0; i < 7; i++) {
-        const d = format(addDays(new Date(), i), 'yyyy-MM-dd');
-        const res = await api.post(`/alerts/check/${d}`);
-        all.push(...res.data.map((a: any) => ({ ...a, checkDate: d })));
-      }
-      setAlerts(all);
+      const days = Array.from({ length: 7 }, (_, i) => format(addDays(new Date(), i), 'yyyy-MM-dd'));
+      const results = await Promise.all(days.map(d => api.get(`/alerts/check/${d}`).then(r => r.data.map((a: any, j: number) => ({ ...a, _key: `${d}-${j}`, checkDate: d }))).catch(() => [])));
+      setAlerts(results.flat());
     } finally {
       setLoading(false);
     }
@@ -41,13 +37,12 @@ export default function AlertsPage() {
 
   useEffect(() => { checkAlerts(); }, []);
 
-  const resolve = async (id: string) => {
-    await api.put(`/alerts/${id}`, { resolved: true });
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  const dismiss = (key: string) => {
+    setAlerts(prev => prev.filter(a => a._key !== key));
   };
 
-  const criticalCount = alerts.filter(a => a.severity === 'critico').length;
-  const warningCount = alerts.filter(a => a.severity === 'aviso').length;
+  const criticalCount = alerts.filter(a => a.severity === 'error').length;
+  const warningCount = alerts.filter(a => a.severity === 'warning').length;
   const infoCount = alerts.filter(a => a.severity === 'info').length;
 
   return (
@@ -101,23 +96,23 @@ export default function AlertsPage() {
       ) : (
         <div className="space-y-3">
           {alerts.map((alert) => (
-            <div key={alert.id} className={`border-l-4 rounded-lg p-4 ${severityColors[alert.severity] || 'bg-gray-50 border-l-gray-300'}`}>
+            <div key={alert._key} className={`border-l-4 rounded-lg p-4 ${severityColors[alert.severity] || 'bg-gray-50 border-l-gray-300'}`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <AlertTriangle size={18} className={
-                    alert.severity === 'critico' ? 'text-red-500 mt-0.5' :
-                    alert.severity === 'aviso' ? 'text-yellow-500 mt-0.5' :
+                    alert.severity === 'error' ? 'text-red-500 mt-0.5' :
+                    alert.severity === 'warning' ? 'text-yellow-500 mt-0.5' :
                     'text-blue-500 mt-0.5'
                   } />
                   <div>
-                    <p className="font-medium text-gray-800">{alert.title}</p>
-                    <p className="text-sm text-gray-600 mt-0.5">{alert.description}</p>
-                    {(alert as any).checkDate && (
-                      <p className="text-xs text-gray-400 mt-1">📅 {format(new Date((alert as any).checkDate + 'T12:00:00'), 'dd/MM/yyyy')}</p>
+                    <p className="font-medium text-gray-800">{alert.type?.replace(/_/g, ' ')}</p>
+                    <p className="text-sm text-gray-600 mt-0.5">{alert.message}</p>
+                    {alert.checkDate && (
+                      <p className="text-xs text-gray-400 mt-1">📅 {format(new Date(alert.checkDate + 'T12:00:00'), 'dd/MM/yyyy')}</p>
                     )}
                   </div>
                 </div>
-                <button onClick={() => resolve(alert.id)}
+                <button onClick={() => dismiss(alert._key)}
                   className="text-xs px-3 py-1.5 bg-white border rounded-lg hover:bg-gray-50 transition flex items-center gap-1 shrink-0">
                   <Check size={12} /> Resolver
                 </button>

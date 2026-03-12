@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { Plus, Search, X, Users, Phone, MessageSquare } from 'lucide-react';
+import { Plus, Search, X, Users, Phone, MessageSquare, Trash2, Edit2, Save } from 'lucide-react';
 import { format } from 'date-fns';
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -24,6 +24,9 @@ export default function LeadsPage() {
   const [pipeline, setPipeline] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
   const [form, setForm] = useState({ name: '', phone: '', campaignId: '', productId: '', sourceMessage: '', salePotential: 'medio' });
+  const [editForm, setEditForm] = useState({ name: '', phone: '', notes: '', saleValue: '' });
+  const [isEditing, setIsEditing] = useState(false);
+  const [historyNote, setHistoryNote] = useState('');
 
   const load = () => {
     Promise.all([
@@ -42,9 +45,13 @@ export default function LeadsPage() {
   useEffect(() => { load(); }, [filter]);
 
   const save = async () => {
-    await api.post('/leads', { ...form, campaignId: form.campaignId || null, productId: form.productId || null });
-    setShowForm(false);
-    load();
+    try {
+      await api.post('/leads', { ...form, campaignId: form.campaignId || null, productId: form.productId || null });
+      setShowForm(false);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao criar lead');
+    }
   };
 
   const updateStatus = async (leadId: string, status: string) => {
@@ -54,6 +61,35 @@ export default function LeadsPage() {
 
   const openLead = async (id: string) => {
     const res = await api.get(`/leads/${id}`);
+    setSelectedLead(res.data);
+    setEditForm({ name: res.data.name || '', phone: res.data.phone || '', notes: res.data.notes || '', saleValue: res.data.saleValue?.toString() || '' });
+    setIsEditing(false);
+    setHistoryNote('');
+  };
+
+  const deleteLead = async (id: string) => {
+    if (!confirm('Remover este lead?')) return;
+    await api.delete(`/leads/${id}`);
+    setSelectedLead(null);
+    load();
+  };
+
+  const saveLeadEdit = async () => {
+    if (!selectedLead) return;
+    const res = await api.put(`/leads/${selectedLead.id}`, {
+      name: editForm.name, phone: editForm.phone, notes: editForm.notes,
+      saleValue: editForm.saleValue ? parseFloat(editForm.saleValue) : null
+    });
+    setSelectedLead(res.data);
+    setIsEditing(false);
+    load();
+  };
+
+  const addHistoryNote = async () => {
+    if (!selectedLead || !historyNote.trim()) return;
+    await api.post(`/leads/${selectedLead.id}/history`, { action: 'Nota', details: historyNote });
+    setHistoryNote('');
+    const res = await api.get(`/leads/${selectedLead.id}`);
     setSelectedLead(res.data);
   };
 
@@ -99,8 +135,8 @@ export default function LeadsPage() {
 
       {/* Pipeline View */}
       {viewMode === 'pipeline' ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {pipelineOrder.slice(0, 4).map(status => {
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {pipelineOrder.map(status => {
             const cfg = statusConfig[status];
             const statusLeads = leads.filter(l => l.status === status);
             return (
@@ -166,13 +202,49 @@ export default function LeadsPage() {
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">{selectedLead.name}</h2>
-              <button onClick={() => setSelectedLead(null)} className="p-1 hover:bg-gray-100 rounded"><X size={20} /></button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setIsEditing(!isEditing)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500" title="Editar">
+                  <Edit2 size={16} />
+                </button>
+                <button onClick={() => deleteLead(selectedLead.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400" title="Remover">
+                  <Trash2 size={16} />
+                </button>
+                <button onClick={() => setSelectedLead(null)} className="p-1 hover:bg-gray-100 rounded"><X size={20} /></button>
+              </div>
             </div>
             <div className="space-y-3">
-              {selectedLead.phone && <p className="text-sm flex items-center gap-2"><Phone size={14} /> {selectedLead.phone}</p>}
-              {selectedLead.campaign && <p className="text-sm">📣 Campanha: {selectedLead.campaign.name}</p>}
-              {selectedLead.product && <p className="text-sm">📦 Produto: {selectedLead.product.name}</p>}
-              {selectedLead.sourceMessage && <p className="text-sm bg-gray-50 p-2 rounded">💬 "{selectedLead.sourceMessage}"</p>}
+              {isEditing ? (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Nome</label>
+                    <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Telefone</label>
+                    <input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Valor da Venda (R$)</label>
+                    <input type="number" step="0.01" value={editForm.saleValue} onChange={e => setEditForm(f => ({ ...f, saleValue: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Observações</label>
+                    <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={3} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <button onClick={saveLeadEdit} className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center justify-center gap-2">
+                    <Save size={16} /> Salvar Alterações
+                  </button>
+                </>
+              ) : (
+                <>
+                  {selectedLead.phone && <p className="text-sm flex items-center gap-2"><Phone size={14} /> {selectedLead.phone}</p>}
+                  {selectedLead.campaign && <p className="text-sm">📣 Campanha: {selectedLead.campaign.name}</p>}
+                  {selectedLead.product && <p className="text-sm">📦 Produto: {selectedLead.product.name}</p>}
+                  {selectedLead.sourceMessage && <p className="text-sm bg-gray-50 p-2 rounded">💬 "{selectedLead.sourceMessage}"</p>}
+                  {selectedLead.saleValue && <p className="text-sm font-medium text-green-600">💰 R$ {selectedLead.saleValue.toFixed(2)}</p>}
+                  {selectedLead.notes && <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{selectedLead.notes}</p>}
+                </>
+              )}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Status</label>
                 <select value={selectedLead.status}
@@ -184,10 +256,25 @@ export default function LeadsPage() {
                   {pipelineOrder.map(s => <option key={s} value={s}>{statusConfig[s]?.label || s}</option>)}
                 </select>
               </div>
-              {selectedLead.notes && <p className="text-sm text-gray-600">{selectedLead.notes}</p>}
+
+              {/* Add history note */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Adicionar Nota</label>
+                <div className="flex gap-2">
+                  <input value={historyNote} onChange={e => setHistoryNote(e.target.value)}
+                    placeholder="Escreva uma observação..." className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                    onKeyDown={e => e.key === 'Enter' && addHistoryNote()} />
+                  <button onClick={addHistoryNote} disabled={!historyNote.trim()}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50">
+                    Salvar
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Histórico</h3>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {selectedLead.history?.length === 0 && <p className="text-xs text-gray-400">Nenhum histórico</p>}
                   {selectedLead.history?.map((h: any) => (
                     <div key={h.id} className="text-xs text-gray-600 border-l-2 border-green-300 pl-3 py-1">
                       <p className="font-medium">{h.action}</p>

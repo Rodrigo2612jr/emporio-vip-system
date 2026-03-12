@@ -42,7 +42,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/calendario" element={<CalendarPage />} />
-        <Route path="/rotina/:date" element={<DailyRoutinePage />} />
+        <Route path="/rotina/:id" element={<DailyRoutinePage />} />
         <Route path="/conteudos" element={<ContentLibraryPage />} />
         <Route path="/midias" element={<MediaLibraryPage />} />
         <Route path="/produtos" element={<ProductsPage />} />

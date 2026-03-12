@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Calendar, FileText, Image, Package, Megaphone,
@@ -8,7 +9,6 @@ import {
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/calendario', icon: Calendar, label: 'Calendário' },
-  { to: '/rotina', icon: FileText, label: 'Rotina Diária' },
   { to: '/conteudos', icon: MessageSquare, label: 'Biblioteca' },
   { to: '/midias', icon: Image, label: 'Mídias' },
   { to: '/produtos', icon: Package, label: 'Produtos' },
@@ -19,7 +19,7 @@ const nav = [
   { to: '/sazonais', icon: CalendarHeart, label: 'Datas Sazonais' },
 ];
 
-export default function Layout() {
+export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -77,7 +77,7 @@ export default function Layout() {
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         <div className="p-6">
-          <Outlet />
+          {children}
         </div>
       </main>
     </div>
