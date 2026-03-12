@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USUÁRIOS E AUTENTICAÇÃO
+// ============================================
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("conteudo") // admin, conteudo, suporte, gestor
+  avatar    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leads         Lead[]
+  dailyRoutines DailyRoutine[]
+}
+
+// ============================================
+// CAMPANHAS
+// ============================================
+model Campaign {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  goal            String?
+  objective       String?
+  mainTrigger     String?
+  status          String   @default("rascunho") // rascunho, ativa, pausada, finalizada, cancelada
+  anchorProductId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  anchorProduct     Product?          @relation("AnchorProduct", fields: [anchorProductId], references: [id])
+  secondaryProducts CampaignProduct[]
+  dailyRoutines     DailyRoutine[]
+  leads             Lead[]
+  linkedPieces      CampaignPiece[]
+  mediaItems        MediaItem[]
+}
+
+model CampaignProduct {
+  id         String @id @default(uuid())
+  campaignId String
+  productId  String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, productId])
+}
+
+model CampaignPiece {
+  id         String   @id @default(uuid())
+  campaignId String
+  title      String
+  type       String
+  content    String?
+  mediaUrl   String?
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// PRODUTOS
+// ============================================
+model Product {
+  id               String   @id @default(uuid())
+  name             String
+  category         String
+  shortDescription String?
+  benefits         String?
+  applications     String?
+  price            Float?
+  promoPrice       Float?
+  imageUrl         String?
+  tags             String?  // JSON array serialized
+  status           String   @default("ativo") // ativo, inativo, promocao
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  anchorCampaigns  Campaign[]        @relation("AnchorProduct")
+  campaignProducts CampaignProduct[]
+  contentItems     ContentItem[]
+  dailyRoutines    DailyRoutine[]
+  leads            Lead[]
+  mediaItems       MediaItem[]
+  messages         Message[]
+}
+
+// ============================================
+// PLANEJAMENTO E ROTINA DIÁRIA
+// ============================================
+model DailyRoutine {
+  id             String   @id @default(uuid())
+  date           DateTime @unique
+  campaignId     String?
+  focusProductId String?
+  objective      String?
+  dailyGoal      String?
+  messageCount   Int      @default(6)
+  notes          String?
+  status         String   @default("rascunho") // rascunho, em_edicao, aprovado, agendado, enviado, cancelado
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  campaign      Campaign? @relation(fields: [campaignId], references: [id])
+  focusProduct  Product?  @relation(fields: [focusProductId], references: [id])
+  createdByUser User?     @relation(fields: [createdBy], references: [id])
+  messages      Message[]
+}
+
+model Message {
+  id             String    @id @default(uuid())
+  dailyRoutineId String
+  order          Int
+  type           String    // enquete, pergunta, conteudo, bastidor, prova_social, receita, tutorial, novidade, reposicao, oferta, urgencia, fechamento, institucional, chamada_site, chamada_loja
+  text           String?
+  cta            String?
+  mediaUrl       String?
+  scheduledTime  String?   // HH:mm format
+  destination    String    @default("grupo_vip") // grupo_vip, instagram, whatsapp_api, todos
+  status         String    @default("rascunho") // rascunho, aprovado, agendado, enviado, cancelado
+  productId      String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  dailyRoutine DailyRoutine @relation(fields: [dailyRoutineId], references: [id], onDelete: Cascade)
+  product      Product?     @relation(fields: [productId], references: [id])
+}
+
+// ============================================
+// BIBLIOTECA DE CONTEÚDO
+// ============================================
+model ContentItem {
+  id            String   @id @default(uuid())
+  title         String
+  category      String
+  subtype       String?
+  text          String
+  cta           String?
+  productId     String?
+  objective     String?
+  mentalTrigger String?
+  format        String?
+  tags          String?  // JSON array serialized
+  mediaUrl      String?
+  usageCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+// ============================================
+// BIBLIOTECA DE MÍDIAS
+// ============================================
+model MediaItem {
+  id           String   @id @default(uuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  category     String
+  productId    String?
+  campaignId   String?
+  tags         String?  // JSON array serialized
+  createdAt    DateTime @default(now())
+
+  product  Product?  @relation(fields: [productId], references: [id])
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+}
+
+// ============================================
+// SUPORTE E ATENDIMENTO (LEADS)
+// ============================================
+model Lead {
+  id            String   @id @default(uuid())
+  name          String
+  phone         String?
+  campaignId    String?
+  productId     String?
+  sourceMessage String?
+  notes         String?
+  assignedTo    String?
+  status        String   @default("novo") // novo, em_atendimento, aguardando_resposta, aguardando_pagamento, fechado, perdido
+  salePotential String?
+  saleValue     Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id])
+  product      Product?     @relation(fields: [productId], references: [id])
+  assignedUser User?        @relation(fields: [assignedTo], references: [id])
+  history      LeadHistory[]
+}
+
+model LeadHistory {
+  id        String   @id @default(uuid())
+  leadId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// DATAS SAZONAIS
+// ============================================
+model SeasonalDate {
+  id          String   @id @default(uuid())
+  name        String
+  date        DateTime
+  description String?
+  campaignTip String?
+  createdAt   DateTime @default(now())
+}
+
+// ============================================
+// ALERTAS
+// ============================================
+model Alert {
+  id          String   @id @default(uuid())
+  type        String
+  message     String
+  severity    String   @default("warning")
+  relatedId   String?
+  relatedType String?
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ============================================
+// MÉTRICAS DIÁRIAS
+// ============================================
+model DailyMetric {
+  id              String   @id @default(uuid())
+  date            DateTime @unique
+  messagesSent    Int      @default(0)
+  responsesCount  Int      @default(0)
+  leadsGenerated  Int      @default(0)
+  salesClosed     Int      @default(0)
+  revenue         Float    @default(0)
+  bestHour        String?
+  bestContentType String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
