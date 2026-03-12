@@ -113,8 +113,9 @@ export default function AlertsPage() {
                   </div>
                 </div>
                 <button onClick={() => dismiss(alert._key)}
-                  className="text-xs px-3 py-1.5 bg-white border rounded-lg hover:bg-gray-50 transition flex items-center gap-1 shrink-0">
-                  <Check size={12} /> Resolver
+                  className="text-xs px-3 py-1.5 bg-white border rounded-lg hover:bg-gray-50 transition flex items-center gap-1 shrink-0"
+                  title="Dispensar este alerta (ele desaparece quando o problema for corrigido)">
+                  <Check size={12} /> Dispensar
                 </button>
               </div>
             </div>

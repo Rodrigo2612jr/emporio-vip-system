@@ -53,9 +53,17 @@ router.post('/seed', async (req: AuthRequest, res: Response): Promise<void> => {
       { name: 'Natal', date: new Date('2026-12-25'), description: 'Natal', campaignTip: 'Cestas de Natal, kits presentes, chocolates' }
     ];
 
-    const created = await prisma.seasonalDate.createMany({ data: dates, skipDuplicates: true });
-    res.json({ message: `${created.count} datas sazonais criadas` });
+    let count = 0;
+    for (const d of dates) {
+      const exists = await prisma.seasonalDate.findFirst({ where: { name: d.name } });
+      if (!exists) {
+        await prisma.seasonalDate.create({ data: d });
+        count++;
+      }
+    }
+    res.json({ message: `${count} datas sazonais criadas` });
   } catch (error) {
+    console.error('Seed error:', error);
     res.status(500).json({ error: 'Erro ao popular datas sazonais' });
   }
 });
