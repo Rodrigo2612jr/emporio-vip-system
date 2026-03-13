@@ -14,6 +14,8 @@ import leadRoutes from './routes/leads';
 import alertRoutes from './routes/alerts';
 import metricsRoutes from './routes/metrics';
 import seasonalRoutes from './routes/seasonal';
+import settingsRoutes from './routes/settings';
+import { startScheduler } from './services/scheduler';
 
 dotenv.config();
 
@@ -36,6 +38,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/seasonal', seasonalRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -51,6 +54,7 @@ app.get('/{*path}', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  startScheduler();
 });
 
 export default app;

@@ -13,6 +13,7 @@ import LeadsPage from './pages/LeadsPage';
 import ReportsPage from './pages/ReportsPage';
 import AlertsPage from './pages/AlertsPage';
 import SeasonalDatesPage from './pages/SeasonalDatesPage';
+import WhatsAppSettingsPage from './pages/WhatsAppSettingsPage';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/relatorios" element={<ReportsPage />} />
         <Route path="/alertas" element={<AlertsPage />} />
         <Route path="/sazonais" element={<SeasonalDatesPage />} />
+        <Route path="/whatsapp" element={<WhatsAppSettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
