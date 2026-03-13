@@ -84,6 +84,33 @@ export async function sendMediaMessage(
   }
 }
 
+export async function fetchGroups(): Promise<{ groups: Array<{ id: string; subject: string; size: number }>; error?: string }> {
+  const config = await getConfig();
+  if (!config) return { groups: [], error: 'WhatsApp API não configurada. Salve as configurações primeiro.' };
+
+  try {
+    const url = `${config.apiUrl}/group/fetchAllGroups/${config.instanceName}?getParticipants=false`;
+    const response = await fetch(url, {
+      headers: { 'apikey': config.apiKey },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      return { groups: [], error: `HTTP ${response.status}: ${body}` };
+    }
+
+    const data = await response.json();
+    const groups = (Array.isArray(data) ? data : []).map((g: any) => ({
+      id: g.id || g.jid || '',
+      subject: g.subject || g.name || 'Sem nome',
+      size: g.size || g.participants?.length || 0,
+    }));
+    return { groups };
+  } catch (err: any) {
+    return { groups: [], error: err.message || 'Erro ao buscar grupos' };
+  }
+}
+
 export async function testConnection(): Promise<{ connected: boolean; error?: string }> {
   const config = await getConfig();
   if (!config) return { connected: false, error: 'WhatsApp API não configurada' };

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { testConnection } from '../services/whatsapp';
+import { testConnection, fetchGroups, sendTextMessage } from '../services/whatsapp';
 
 const router = Router();
 router.use(authMiddleware);
@@ -65,6 +65,26 @@ router.post('/whatsapp/test', async (_req: AuthRequest, res: Response): Promise<
     res.json(result);
   } catch (error) {
     res.status(500).json({ connected: false, error: 'Erro ao testar conexão' });
+  }
+});
+
+// Listar grupos do WhatsApp
+router.get('/whatsapp/groups', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await fetchGroups();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ groups: [], error: 'Erro ao buscar grupos' });
+  }
+});
+
+// Enviar mensagem de teste
+router.post('/whatsapp/send-test', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await sendTextMessage(req.body.text || '✅ Teste do Empório VIP System - Conexão funcionando!');
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Erro ao enviar mensagem de teste' });
   }
 });
 

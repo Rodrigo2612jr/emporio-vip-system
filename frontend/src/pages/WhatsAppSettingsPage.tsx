@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
-import { Settings, Wifi, WifiOff, Save, TestTube, MessageSquare, ExternalLink } from 'lucide-react';
+import { Settings, Wifi, WifiOff, Save, TestTube, MessageSquare, ExternalLink, Users, Send, RefreshCw } from 'lucide-react';
 
 export default function WhatsAppSettingsPage() {
   const [form, setForm] = useState({
@@ -11,6 +11,10 @@ export default function WhatsAppSettingsPage() {
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groups, setGroups] = useState<Array<{ id: string; subject: string; size: number }>>([]);
+  const [showGroups, setShowGroups] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<null | { connected: boolean; error?: string }>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -50,6 +54,44 @@ export default function WhatsAppSettingsPage() {
       setMessage({ type: 'error', text: 'Erro ao testar conexão' });
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleFetchGroups = async () => {
+    setLoadingGroups(true);
+    setMessage(null);
+    try {
+      const res = await api.get('/settings/whatsapp/groups');
+      if (res.data.error) {
+        setMessage({ type: 'error', text: res.data.error });
+      } else {
+        setGroups(res.data.groups || []);
+        setShowGroups(true);
+        if ((res.data.groups || []).length === 0) {
+          setMessage({ type: 'error', text: 'Nenhum grupo encontrado. Verifique se o WhatsApp está conectado.' });
+        }
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Erro ao buscar grupos' });
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setSendingTest(true);
+    setMessage(null);
+    try {
+      const res = await api.post('/settings/whatsapp/send-test');
+      if (res.data.success) {
+        setMessage({ type: 'success', text: 'Mensagem de teste enviada com sucesso! Verifique o grupo.' });
+      } else {
+        setMessage({ type: 'error', text: res.data.error || 'Erro ao enviar mensagem de teste' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Erro ao enviar mensagem de teste' });
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -97,14 +139,24 @@ export default function WhatsAppSettingsPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleTest}
-            disabled={testing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
-          >
-            <TestTube className="w-4 h-4" />
-            {testing ? 'Testando...' : 'Testar Conexão'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+            >
+              <TestTube className="w-4 h-4" />
+              {testing ? 'Testando...' : 'Testar Conexão'}
+            </button>
+            <button
+              onClick={handleSendTest}
+              disabled={sendingTest}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+            >
+              <Send className="w-4 h-4" />
+              {sendingTest ? 'Enviando...' : 'Enviar Teste'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -152,15 +204,40 @@ export default function WhatsAppSettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ID do Grupo</label>
-            <input
-              type="text"
-              value={form.whatsapp_group_id}
-              onChange={e => setForm(f => ({ ...f, whatsapp_group_id: e.target.value }))}
-              placeholder="120363XXXXXXXXXX@g.us"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">ID do grupo WhatsApp VIP (formato: 120363...@g.us)</p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de Destino</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.whatsapp_group_id}
+                onChange={e => setForm(f => ({ ...f, whatsapp_group_id: e.target.value }))}
+                placeholder="120363XXXXXXXXXX@g.us"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+              />
+              <button
+                onClick={handleFetchGroups}
+                disabled={loadingGroups}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm whitespace-nowrap"
+              >
+                {loadingGroups ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                {loadingGroups ? 'Buscando...' : 'Buscar Grupos'}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-400">Clique em "Buscar Grupos" para listar seus grupos e selecionar</p>
+
+            {showGroups && groups.length > 0 && (
+              <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                {groups.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => { setForm(f => ({ ...f, whatsapp_group_id: g.id })); setShowGroups(false); setMessage({ type: 'success', text: `Grupo "${g.subject}" selecionado!` }); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0 flex justify-between items-center ${form.whatsapp_group_id === g.id ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                  >
+                    <span className="font-medium">{g.subject}</span>
+                    <span className="text-xs text-gray-400">{g.size} membros</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -178,16 +255,20 @@ export default function WhatsAppSettingsPage() {
 
       {/* Info Card */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-        <h3 className="font-semibold text-amber-800 mb-2">Como funciona o envio automático?</h3>
+        <h3 className="font-semibold text-amber-800 mb-2">Como conectar ao seu grupo?</h3>
         <ul className="text-sm text-amber-700 space-y-2">
-          <li>• Configure acima a conexão com sua instância da <strong>Evolution API</strong></li>
-          <li>• No <strong>Calendário</strong>, crie rotinas diárias com mensagens e horários</li>
-          <li>• Mude o status da rotina para <strong>"Agendado"</strong></li>
-          <li>• Mude o status das mensagens para <strong>"Agendado"</strong></li>
-          <li>• O sistema verifica a cada minuto e envia automaticamente no horário programado</li>
-          <li>• Mensagens com destino <strong>"Grupo VIP"</strong>, <strong>"WhatsApp API"</strong> ou <strong>"Todos"</strong> serão enviadas</li>
+          <li><strong>1.</strong> Tenha uma instância da <strong>Evolution API</strong> rodando (própria ou hospedada)</li>
+          <li><strong>2.</strong> Preencha a <strong>URL</strong>, <strong>API Key</strong> e <strong>Nome da Instância</strong> acima</li>
+          <li><strong>3.</strong> Clique <strong>"Salvar"</strong> e depois <strong>"Testar Conexão"</strong> para verificar</li>
+          <li><strong>4.</strong> Clique <strong>"Buscar Grupos"</strong> para ver todos os seus grupos do WhatsApp</li>
+          <li><strong>5.</strong> Selecione o grupo de teste (ex: "Grupo Teste X") e salve</li>
+          <li><strong>6.</strong> Clique <strong>"Enviar Teste"</strong> para enviar uma mensagem de teste no grupo</li>
+          <li><strong>7.</strong> Quando estiver satisfeito, troque para o grupo VIP real e salve</li>
         </ul>
-        <div className="mt-3 pt-3 border-t border-amber-200">
+        <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+          <p className="text-xs text-amber-600">
+            <strong>Dica:</strong> Para testar, crie um grupo só com você e o número da API. Use "Buscar Grupos" para achá-lo e "Enviar Teste" para confirmar.
+          </p>
           <a
             href="https://doc.evolution-api.com"
             target="_blank"
