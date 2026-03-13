@@ -23,9 +23,11 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 WORKDIR /app/backend
 
-ENV NODE_ENV=production
-ENV PORT=3002
+# Criar pasta de dados para SQLite persistente
+RUN mkdir -p /app/backend/data
 
-EXPOSE 3002
+ENV NODE_ENV=production
+
+EXPOSE ${PORT:-3002}
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node --import tsx src/server.ts"]
