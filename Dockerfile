@@ -6,28 +6,28 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Build backend
-FROM node:20-alpine AS backend-build
-WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci
-COPY backend/ ./
-RUN npx prisma generate
-
 # Production
 FROM node:20-alpine
-WORKDIR /app
-
-COPY --from=backend-build /app/backend ./backend
-COPY --from=frontend-build /app/frontend/dist ./frontend/dist
-
 WORKDIR /app/backend
 
-# Criar pasta de dados para SQLite persistente
-RUN mkdir -p /app/backend/data
+# Instalar dependências do backend
+COPY backend/package*.json ./
+RUN npm ci
+
+# Copiar código do backend
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+COPY backend/prisma ./prisma
+
+# Gerar Prisma client
+RUN npx prisma generate
+
+# Copiar frontend build
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
+
+# Criar pasta de dados e uploads
+RUN mkdir -p /app/backend/data /app/backend/uploads
 
 ENV NODE_ENV=production
 
-EXPOSE ${PORT:-3002}
-
-CMD ["sh", "-c", "npx prisma migrate deploy && node --import tsx src/server.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/server.ts"]
