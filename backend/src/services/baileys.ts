@@ -101,9 +101,12 @@ export async function sendImage(jid: string, imageUrl: string, caption?: string)
 export async function getGroups(): Promise<Array<{ id: string; subject: string; size: number }>> {
   if (!sock || connectionState !== 'open') throw new Error('WhatsApp não conectado');
   const groups = await sock.groupFetchAllParticipating();
-  return Object.values(groups).map((g: any) => ({
-    id: g.id,
-    subject: g.subject || 'Sem nome',
-    size: g.participants?.length || 0,
-  }));
+  if (!groups || typeof groups !== 'object') return [];
+  return Object.values(groups)
+    .filter((g: any) => g && g.id)
+    .map((g: any) => ({
+      id: String(g.id || ''),
+      subject: String(g.subject || g.name || 'Sem nome'),
+      size: Number(g.participants?.length || g.size || 0),
+    }));
 }

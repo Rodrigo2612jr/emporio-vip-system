@@ -100,9 +100,10 @@ export default function WhatsAppSettingsPage() {
       if (res.data.error) {
         setMessage({ type: 'error', text: res.data.error });
       } else {
-        setGroups(res.data.groups || []);
+        const groupList = Array.isArray(res.data.groups) ? res.data.groups : [];
+        setGroups(groupList.map((g: any) => ({ id: String(g?.id || ''), subject: String(g?.subject || 'Sem nome'), size: Number(g?.size || 0) })));
         setShowGroups(true);
-        if ((res.data.groups || []).length === 0) {
+        if (groupList.length === 0) {
           setMessage({ type: 'error', text: 'Nenhum grupo encontrado.' });
         }
       }
