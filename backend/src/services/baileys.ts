@@ -100,13 +100,35 @@ export async function sendImage(jid: string, imageUrl: string, caption?: string)
 
 export async function getGroups(): Promise<Array<{ id: string; subject: string; size: number }>> {
   if (!sock || connectionState !== 'open') throw new Error('WhatsApp não conectado');
-  const groups = await sock.groupFetchAllParticipating();
-  if (!groups || typeof groups !== 'object') return [];
-  return Object.values(groups)
-    .filter((g: any) => g && g.id)
-    .map((g: any) => ({
-      id: String(g.id || ''),
-      subject: String(g.subject || g.name || 'Sem nome'),
-      size: Number(g.participants?.length || g.size || 0),
-    }));
+
+  // Timeout de 15s para evitar travamento
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Timeout ao buscar grupos (15s)')), 15000)
+  );
+
+  let rawGroups: any;
+  try {
+    rawGroups = await Promise.race([
+      sock.groupFetchAllParticipating(),
+      timeoutPromise,
+    ]);
+  } catch (err: any) {
+    console.error('[WhatsApp] Erro em groupFetchAllParticipating:', err?.message || err);
+    throw new Error(err?.message || 'Erro ao buscar grupos do WhatsApp');
+  }
+
+  if (!rawGroups || typeof rawGroups !== 'object') return [];
+
+  try {
+    return Object.values(rawGroups)
+      .filter((g: any) => g && g.id)
+      .map((g: any) => ({
+        id: String(g.id ?? ''),
+        subject: String(g.subject ?? g.name ?? 'Sem nome'),
+        size: Number(g.participants?.length ?? g.size ?? 0),
+      }));
+  } catch (err: any) {
+    console.error('[WhatsApp] Erro ao processar dados dos grupos:', err?.message || err);
+    return [];
+  }
 }

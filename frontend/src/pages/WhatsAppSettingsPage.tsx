@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../lib/api';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { Wifi, WifiOff, Save, MessageSquare, Users, Send, RefreshCw, QrCode, Unplug } from 'lucide-react';
 
 export default function WhatsAppSettingsPage() {
@@ -110,19 +111,33 @@ export default function WhatsAppSettingsPage() {
     setLoadingGroups(true);
     setMessage(null);
     try {
-      const res = await api.get('/settings/whatsapp/groups');
-      if (res.data.error) {
-        setMessage({ type: 'error', text: res.data.error });
-      } else {
-        const groupList = Array.isArray(res.data.groups) ? res.data.groups : [];
-        setGroups(groupList.map((g: any) => ({ id: String(g?.id || ''), subject: String(g?.subject || 'Sem nome'), size: Number(g?.size || 0) })));
-        setShowGroups(true);
-        if (groupList.length === 0) {
-          setMessage({ type: 'error', text: 'Nenhum grupo encontrado.' });
-        }
+      const res = await api.get('/settings/whatsapp/groups', { timeout: 20000 });
+      const data = res?.data;
+      if (!data || typeof data !== 'object') {
+        setMessage({ type: 'error', text: 'Resposta inválida do servidor' });
+        return;
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Erro ao buscar grupos' });
+      if (data.error) {
+        setMessage({ type: 'error', text: String(data.error) });
+        return;
+      }
+      const groupList = Array.isArray(data.groups) ? data.groups : [];
+      const safeGroups = groupList
+        .filter((g: any) => g && typeof g === 'object' && g.id)
+        .map((g: any) => ({
+          id: String(g.id ?? ''),
+          subject: String(g.subject ?? g.name ?? 'Sem nome'),
+          size: Number(g.size ?? 0),
+        }));
+      setGroups(safeGroups);
+      setShowGroups(true);
+      if (safeGroups.length === 0) {
+        setMessage({ type: 'error', text: 'Nenhum grupo encontrado.' });
+      }
+    } catch (err: any) {
+      console.error('Erro ao buscar grupos:', err);
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao buscar grupos';
+      setMessage({ type: 'error', text: String(msg) });
     } finally {
       setLoadingGroups(false);
     }
@@ -148,6 +163,7 @@ export default function WhatsAppSettingsPage() {
   const isConnected = connectionState === 'open';
 
   return (
+    <ErrorBoundary>
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <div className="bg-green-100 p-2 rounded-lg">
@@ -308,5 +324,6 @@ export default function WhatsAppSettingsPage() {
         </p>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
