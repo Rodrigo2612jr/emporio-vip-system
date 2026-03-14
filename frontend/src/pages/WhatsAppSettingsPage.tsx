@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { Wifi, WifiOff, Save, MessageSquare, Users, Send, RefreshCw, QrCode, Unplug } from 'lucide-react';
+import { Wifi, WifiOff, Save, MessageSquare, Users, Send, RefreshCw, QrCode, Unplug, Search } from 'lucide-react';
 
 export default function WhatsAppSettingsPage() {
   const [groupId, setGroupId] = useState('');
@@ -14,7 +14,12 @@ export default function WhatsAppSettingsPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [groups, setGroups] = useState<Array<{ id: string; subject: string; size: number }>>([]);
   const [showGroups, setShowGroups] = useState(false);
+  const [groupSearch, setGroupSearch] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const filteredGroups = groups.filter(g =>
+    g.subject.toLowerCase().includes(groupSearch.toLowerCase())
+  );
 
   const loadSettings = useCallback(async () => {
     try {
@@ -274,17 +279,31 @@ export default function WhatsAppSettingsPage() {
           </div>
 
           {showGroups && groups.length > 0 && (
-            <div className="mb-4 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-              {groups.map(g => (
-                <button
-                  key={g.id}
-                  onClick={() => { setGroupId(g.id); setShowGroups(false); setMessage({ type: 'success', text: `Grupo "${g.subject}" selecionado!` }); }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0 flex justify-between items-center ${groupId === g.id ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
-                >
-                  <span className="font-medium">{g.subject}</span>
-                  <span className="text-xs text-gray-400">{g.size} membros</span>
-                </button>
-              ))}
+            <div className="mb-4">
+              <div className="relative mb-2">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={groupSearch}
+                  onChange={e => setGroupSearch(e.target.value)}
+                  placeholder="Pesquisar grupo..."
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                {filteredGroups.length > 0 ? filteredGroups.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => { setGroupId(g.id); setShowGroups(false); setGroupSearch(''); setMessage({ type: 'success', text: `Grupo "${g.subject}" selecionado!` }); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0 flex justify-between items-center ${groupId === g.id ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                  >
+                    <span className="font-medium">{g.subject}</span>
+                    <span className="text-xs text-gray-400">{g.size} membros</span>
+                  </button>
+                )) : (
+                  <p className="px-3 py-2 text-sm text-gray-400">Nenhum grupo encontrado</p>
+                )}
+              </div>
             </div>
           )}
 
