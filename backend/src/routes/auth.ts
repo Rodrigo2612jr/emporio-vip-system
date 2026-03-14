@@ -59,6 +59,49 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
   }
 });
 
+// Listar todos os usuários (admin only)
+router.get('/users', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Apenas admin pode listar usuários' });
+      return;
+    }
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao listar usuários' });
+  }
+});
+
+// Atualizar usuário (admin only)
+router.put('/users/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Apenas admin pode editar usuários' });
+      return;
+    }
+    const { id } = req.params;
+    const { name, email, role, active, password } = req.body;
+    const data: Record<string, unknown> = {};
+    if (name) data.name = name;
+    if (email) data.email = email;
+    if (role) data.role = role;
+    if (active !== undefined) data.active = active;
+    if (password) data.password = await bcrypt.hash(password, 10);
+    const user = await prisma.user.update({
+      where: { id: String(id) },
+      data,
+      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true }
+    });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar usuário' });
+  }
+});
+
 // Setup inicial - cria admin se não existir nenhum usuário
 router.post('/setup', async (req: Request, res: Response): Promise<void> => {
   try {

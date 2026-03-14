@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Calendar, FileText, Image, Package, Megaphone,
-  MessageSquare, BarChart3, AlertTriangle, CalendarHeart, LogOut, Leaf, Users, Settings
+  MessageSquare, BarChart3, AlertTriangle, CalendarHeart, LogOut, Leaf, Users, Settings, UserCog
 } from 'lucide-react';
 
 const nav = [
@@ -18,6 +18,7 @@ const nav = [
   { to: '/alertas', icon: AlertTriangle, label: 'Alertas' },
   { to: '/sazonais', icon: CalendarHeart, label: 'Datas Sazonais' },
   { to: '/whatsapp', icon: Settings, label: 'WhatsApp API' },
+  { to: '/usuarios', icon: UserCog, label: 'Usuários' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
