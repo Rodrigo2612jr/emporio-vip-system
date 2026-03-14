@@ -25,8 +25,8 @@ RUN npx prisma generate
 # Copiar frontend build
 COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
-# Criar pasta de dados e uploads
-RUN mkdir -p /app/backend/data /app/backend/uploads
+# Criar pasta de dados, uploads e auth do WhatsApp
+RUN mkdir -p /app/backend/data /app/backend/uploads /app/backend/data/whatsapp_auth
 
 ENV NODE_ENV=production
 

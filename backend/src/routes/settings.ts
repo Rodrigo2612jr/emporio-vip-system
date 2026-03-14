@@ -2,63 +2,73 @@ import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { testConnection, fetchGroups, sendTextMessage } from '../services/whatsapp';
+import * as baileys from '../services/baileys';
 
 const router = Router();
 router.use(authMiddleware);
 
-const WHATSAPP_KEYS = ['whatsapp_api_url', 'whatsapp_api_key', 'whatsapp_instance', 'whatsapp_group_id'];
-
 // Buscar configurações do WhatsApp
 router.get('/whatsapp', async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const settings = await prisma.setting.findMany({
-      where: { key: { in: WHATSAPP_KEYS } },
+    const groupSetting = await prisma.setting.findUnique({ where: { key: 'whatsapp_group_id' } });
+    res.json({
+      whatsapp_group_id: groupSetting?.value || '',
+      connection_state: baileys.getConnectionState(),
     });
-
-    const config: Record<string, string> = {};
-    for (const s of settings) {
-      // Mask the API key for security
-      if (s.key === 'whatsapp_api_key' && s.value) {
-        config[s.key] = s.value.substring(0, 8) + '••••••••';
-      } else {
-        config[s.key] = s.value;
-      }
-    }
-
-    res.json(config);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar configurações' });
   }
 });
 
-// Salvar configurações do WhatsApp
+// Salvar grupo do WhatsApp
 router.put('/whatsapp', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { whatsapp_api_url, whatsapp_api_key, whatsapp_instance, whatsapp_group_id } = req.body;
-
-    const entries: { key: string; value: string }[] = [];
-    if (whatsapp_api_url !== undefined) entries.push({ key: 'whatsapp_api_url', value: whatsapp_api_url });
-    if (whatsapp_api_key !== undefined && !whatsapp_api_key.includes('••••')) {
-      entries.push({ key: 'whatsapp_api_key', value: whatsapp_api_key });
-    }
-    if (whatsapp_instance !== undefined) entries.push({ key: 'whatsapp_instance', value: whatsapp_instance });
-    if (whatsapp_group_id !== undefined) entries.push({ key: 'whatsapp_group_id', value: whatsapp_group_id });
-
-    for (const entry of entries) {
+    const { whatsapp_group_id } = req.body;
+    if (whatsapp_group_id !== undefined) {
       await prisma.setting.upsert({
-        where: { key: entry.key },
-        update: { value: entry.value },
-        create: { key: entry.key, value: entry.value },
+        where: { key: 'whatsapp_group_id' },
+        update: { value: whatsapp_group_id },
+        create: { key: 'whatsapp_group_id', value: whatsapp_group_id },
       });
     }
-
     res.json({ message: 'Configurações salvas com sucesso' });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao salvar configurações' });
   }
 });
 
-// Testar conexão com WhatsApp API
+// Obter QR Code para conectar WhatsApp
+router.get('/whatsapp/qr', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const state = baileys.getConnectionState();
+    if (state === 'open') {
+      res.json({ connected: true, qr: null });
+      return;
+    }
+    // Inicia a conexão se não estiver conectando
+    if (state === 'close') {
+      baileys.startBaileys();
+    }
+    // Aguarda um pouco para o QR ser gerado
+    await new Promise(r => setTimeout(r, 2000));
+    const qr = baileys.getQRCode();
+    res.json({ connected: false, qr });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao obter QR Code' });
+  }
+});
+
+// Desconectar WhatsApp
+router.post('/whatsapp/disconnect', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await baileys.disconnectBaileys();
+    res.json({ message: 'Desconectado' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao desconectar' });
+  }
+});
+
+// Testar conexão com WhatsApp
 router.post('/whatsapp/test', async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await testConnection();
