@@ -44,7 +44,7 @@ export default function WhatsAppSettingsPage() {
 
   const handleConnect = async () => {
     setLoadingQR(true);
-    setMessage(null);
+    setMessage({ type: 'success', text: 'Conectando ao WhatsApp... aguarde.' });
     try {
       const res = await api.get('/settings/whatsapp/qr');
       if (res.data.connected) {
@@ -56,7 +56,21 @@ export default function WhatsAppSettingsPage() {
         setConnectionState('connecting');
         setMessage({ type: 'success', text: 'QR Code gerado! Escaneie com seu WhatsApp.' });
       } else {
-        setMessage({ type: 'error', text: 'QR Code ainda não disponível. Tente novamente em alguns segundos.' });
+        // Tenta uma segunda vez automaticamente
+        setMessage({ type: 'success', text: 'Aguardando QR Code...' });
+        await new Promise(r => setTimeout(r, 3000));
+        const res2 = await api.get('/settings/whatsapp/qr');
+        if (res2.data.connected) {
+          setConnectionState('open');
+          setQrCode(null);
+          setMessage({ type: 'success', text: 'Já está conectado!' });
+        } else if (res2.data.qr) {
+          setQrCode(res2.data.qr);
+          setConnectionState('connecting');
+          setMessage({ type: 'success', text: 'QR Code gerado! Escaneie com seu WhatsApp.' });
+        } else {
+          setMessage({ type: 'error', text: 'QR Code ainda não disponível. Clique em Conectar novamente.' });
+        }
       }
     } catch {
       setMessage({ type: 'error', text: 'Erro ao gerar QR Code' });

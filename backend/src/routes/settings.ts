@@ -49,9 +49,16 @@ router.get('/whatsapp/qr', async (_req: AuthRequest, res: Response): Promise<voi
     if (state === 'close') {
       baileys.startBaileys();
     }
-    // Aguarda um pouco para o QR ser gerado
-    await new Promise(r => setTimeout(r, 2000));
-    const qr = baileys.getQRCode();
+    // Aguarda até 10s pelo QR ser gerado
+    let qr = baileys.getQRCode();
+    for (let i = 0; i < 10 && !qr; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      qr = baileys.getQRCode();
+      if (baileys.getConnectionState() === 'open') {
+        res.json({ connected: true, qr: null });
+        return;
+      }
+    }
     res.json({ connected: false, qr });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao obter QR Code' });
