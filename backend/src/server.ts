@@ -16,6 +16,7 @@ import metricsRoutes from './routes/metrics';
 import seasonalRoutes from './routes/seasonal';
 import settingsRoutes from './routes/settings';
 import { startScheduler } from './services/scheduler';
+import { autoStartBaileys } from './services/baileys';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.get('/{*path}', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
   startScheduler();
+  autoStartBaileys();
 });
 
 export default app;

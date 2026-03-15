@@ -1,11 +1,15 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import path from 'path';
+import fs from 'fs';
 
 let sock: ReturnType<typeof makeWASocket> | null = null;
 let connectionState: 'close' | 'connecting' | 'open' = 'close';
 let qrCodeDataUrl: string | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let manualDisconnect = false;
+
+const AUTH_DIR = path.join(process.cwd(), 'data', 'whatsapp_auth');
 
 export function getConnectionState() {
   return connectionState;
@@ -22,10 +26,13 @@ export function getSocket() {
 export async function startBaileys() {
   if (connectionState === 'open' || connectionState === 'connecting') return;
   connectionState = 'connecting';
+  manualDisconnect = false;
 
   try {
-    const authDir = path.join(process.cwd(), 'data', 'whatsapp_auth');
-    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    if (!fs.existsSync(AUTH_DIR)) {
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
@@ -53,12 +60,12 @@ export async function startBaileys() {
         connectionState = 'close';
         qrCodeDataUrl = null;
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-        if (statusCode !== DisconnectReason.loggedOut) {
+        if (statusCode !== DisconnectReason.loggedOut && !manualDisconnect) {
           console.log('[WhatsApp] Desconectado, reconectando em 5s...');
           if (reconnectTimer) clearTimeout(reconnectTimer);
           reconnectTimer = setTimeout(() => startBaileys(), 5000);
         } else {
-          console.log('[WhatsApp] Deslogado. Exclua data/whatsapp_auth e reconecte.');
+          console.log('[WhatsApp] Deslogado pelo usuário.');
           sock = null;
         }
       } else if (connection === 'open') {
@@ -76,6 +83,7 @@ export async function startBaileys() {
 }
 
 export async function disconnectBaileys() {
+  manualDisconnect = true;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -86,6 +94,33 @@ export async function disconnectBaileys() {
   }
   connectionState = 'close';
   qrCodeDataUrl = null;
+  // Limpa arquivos de auth para desconectar de verdade
+  try {
+    if (fs.existsSync(AUTH_DIR)) {
+      const files = fs.readdirSync(AUTH_DIR);
+      for (const file of files) {
+        fs.unlinkSync(path.join(AUTH_DIR, file));
+      }
+    }
+  } catch (err) {
+    console.error('[WhatsApp] Erro ao limpar auth:', err);
+  }
+}
+
+// Auto-conecta no boot se já tiver sessão salva
+export async function autoStartBaileys() {
+  try {
+    if (!fs.existsSync(AUTH_DIR)) return;
+    const files = fs.readdirSync(AUTH_DIR);
+    if (files.length > 0) {
+      console.log('[WhatsApp] Sessão anterior encontrada, reconectando automaticamente...');
+      await startBaileys();
+    } else {
+      console.log('[WhatsApp] Nenhuma sessão salva. Aguardando conexão manual.');
+    }
+  } catch (err) {
+    console.error('[WhatsApp] Erro no auto-start:', err);
+  }
 }
 
 export async function sendText(jid: string, text: string): Promise<void> {
